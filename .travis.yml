@@ -1,0 +1,13 @@
+language: generic
+sudo: enabled
+services: docker
+
+before_install:
+  - export DOCKER_IMAGE=debian:sid
+  - docker pull $DOCKER_IMAGE
+
+script:
+  - .travis-ci/run_docker.sh $DOCKER_IMAGE
+
+notifications:
+  email: false
