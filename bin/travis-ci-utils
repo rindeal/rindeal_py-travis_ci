@@ -1,9 +1,5 @@
 #!/usr/bin/env python3.6
 ##
-# Rindeal's Suite of Helpers and Utilities for Travis CI
-#
-# just a bunch of helper functions to make life easier
-#
 # Copyright (C) 2018  Jan Chren (rindeal)
 #
 # This program is free software: you can redistribute it and/or modify
@@ -26,10 +22,13 @@ import typing
 import sys
 import pathlib
 import tempfile
+import os
 
-# sys.path.insert(0, ".")  # DEBUG
-from rindeal.travis_ci._pkg_metadata import metadata
-from rindeal.travis_ci import Fold, Timer
+if os.path.exists("rindeal/travis_ci/utils"):
+	sys.path.insert(0, ".")
+from rindeal.travis_ci.utils import Fold, Timer
+from rindeal.travis_ci.utils._pkg_metadata import metadata
+
 
 SubParserType = type(argparse.ArgumentParser().add_subparsers())
 
@@ -159,7 +158,7 @@ class Main:
 	@staticmethod
 	def create_main_parser() -> argparse.ArgumentParser:
 		parser = argparse.ArgumentParser(
-			description="Travis CI Utilities Suite",
+			description=metadata.short_description,
 			formatter_class=argparse.RawDescriptionHelpFormatter,
 		)
 		parser.add_argument(

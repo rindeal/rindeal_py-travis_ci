@@ -1,9 +1,5 @@
 #!/usr/bin/env python3.6
 ##
-# Rindeal's Suite of Helpers and Utilities for Travis CI
-#
-# just a bunch of helper functions to make life easier
-#
 # Copyright (C) 2018  Jan Chren (rindeal)
 #
 # This program is free software: you can redistribute it and/or modify

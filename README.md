@@ -1,7 +1,7 @@
-travis_ci
-==========
+travis-ci-utils
+================
 
-Python utilities for your Travis CI jobs
+Python and CLI utilities for your Travis CI jobs
 
 Examples
 ---------
