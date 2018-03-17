@@ -202,11 +202,11 @@ class AnsiEscSeq:
 		return f'{cls.CSI}{params}m'
 
 	@classmethod
-	def colour(cls, str_in: str, fg: str="", bg: str="", style: str="") -> str:
+	def colour(cls, text: str, fg: str= "", bg: str= "", style: str= "") -> str:
 		"""
 		Colourize string
 
-		:param str_in:
+		:param text:
 		:param fg: foreground colour;
 				possible values: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white` and `grey`
 		:param bg: background colour;
@@ -231,7 +231,7 @@ class AnsiEscSeq:
 		for c in codes:
 			str_out += cls.sgr(c['open'])
 
-		str_out += str_in
+		str_out += text
 
 		while codes:
 			str_out += cls.sgr(codes.pop()['close'])
@@ -239,7 +239,7 @@ class AnsiEscSeq:
 		return str_out
 
 	@classmethod
-	def el(cls, param="", selective=False) -> str:
+	def el(cls, param: typing.Union[int, str] ="", selective: bool =False) -> str:
 		"""
 		EL (Erase in Line)
 
@@ -275,19 +275,24 @@ class AnsiEscSeq:
 		return os.isatty(sys.stdout.fileno()) and os.isatty(sys.stderr.fileno())
 
 
+def colour(*args, **kwargs):
+	return AnsiEscSeq.colour(*args, **kwargs)
+
+
 class _TimerFoldBase:
 	_stream: typing.Optional[typing.TextIO]
+	_MaybeStreamType = typing.Union[int, str]
 
-	def __init__(self, stream: typing.TextIO =None):
+	def __init__(self, stream: typing.TextIO =sys.stdout):
 		self._stream = stream
 
-	def start(self) -> typing.Union[int, str]:
+	def start(self) -> _MaybeStreamType:
 		raise NotImplementedError
 
-	def end(self) -> typing.Union[int, str]:
+	def end(self) -> _MaybeStreamType:
 		raise NotImplementedError
 
-	def _maybe_stream_write(self, str_out: str) -> typing.Union[int, str]:
+	def _maybe_stream_write(self, str_out: str) -> _MaybeStreamType:
 		return self._stream.write(str_out) if self._stream else str_out
 
 	def __enter__(self):
@@ -305,7 +310,7 @@ class Timer(_TimerFoldBase):
 	_id: str
 	_start_time: int
 
-	def __init__(self, stream: typing.TextIO =None, timer_id: str =None, start_time: int =0):
+	def __init__(self, stream: typing.TextIO =sys.stdout, timer_id: str =None, start_time: int =0):
 		super().__init__(stream)
 		self._id = timer_id if timer_id else uuid.uuid4()
 		self._start_time = start_time
@@ -320,7 +325,7 @@ class Timer(_TimerFoldBase):
 	def _nanoseconds():
 		return int(time.time()*1e9)
 
-	def start(self) -> typing.Union[int, str]:
+	def start(self) -> _TimerFoldBase._MaybeStreamType:
 		"""
 		Start timer
 
@@ -344,7 +349,7 @@ class Timer(_TimerFoldBase):
 
 		return self._maybe_stream_write(str_out)
 
-	def end(self) -> typing.Union[int, str]:
+	def end(self) -> _TimerFoldBase._MaybeStreamType:
 		"""
 		End timer and write result
 
@@ -394,7 +399,7 @@ class Fold(_TimerFoldBase):
 	_desc: str
 	_started: bool
 
-	def __init__(self, tag, desc="", stream: typing.TextIO =None, started: bool =False):
+	def __init__(self, tag: str, desc: str ="", stream: typing.TextIO =sys.stdout, started: bool =False):
 		self._tag = tag
 		self._desc = desc
 		super().__init__(stream)
@@ -404,7 +409,7 @@ class Fold(_TimerFoldBase):
 		tmpl = 'travis_fold:{action}:{tag}\r{clear}'
 		return tmpl.format(action=action, tag=self._tag, clear=AnsiEscSeq.el())
 
-	def start(self) -> typing.Union[int, str]:
+	def start(self) -> _TimerFoldBase._MaybeStreamType:
 		"""
 		@link https://github.com/travis-ci/worker/blob/a8bdf4846ac390bba372d3f56ff0552a025da4af/package.go
 
@@ -426,7 +431,7 @@ class Fold(_TimerFoldBase):
 
 		return self._maybe_stream_write(str_out)
 
-	def end(self) -> typing.Union[int, str]:
+	def end(self) -> _TimerFoldBase._MaybeStreamType:
 		if not self._started:
 			raise Exception("travis fold not started yet")
 

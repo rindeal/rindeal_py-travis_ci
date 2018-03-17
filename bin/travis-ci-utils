@@ -27,7 +27,7 @@ import sys
 import pathlib
 import tempfile
 
-sys.path.insert(0, ".")
+# sys.path.insert(0, ".")  # DEBUG
 from rindeal.travis_ci._pkg_metadata import metadata
 from rindeal.travis_ci import Fold, Timer
 
@@ -116,24 +116,24 @@ class SubCmdTimer(SubCmd):
 		timer_id = timer.get_id()
 		timer_start_time = timer.get_start_time()
 
-		## create and write timer object
+		# >> create and write timer object
 		start_obj = f"{timer_id}{self._delimiter}{timer_start_time}"
 		with tmpfile.open('w+') as f:
 			f.write(start_obj)
 
 	def _handle_end(self, tmpfile: pathlib.PosixPath) -> None:
-		## read timer object
+		# >> read timer object
 		if not tmpfile.exists():
 			raise Exception('no timer with this id found')
 		with tmpfile.open('r') as f:
 			start_obj = f.read()
 		tmpfile.unlink()
 
-		## parse timer object
+		# >> parse timer object
 		timer_id, timer_start_time = start_obj.split(self._delimiter)
 		timer_start_time = int(timer_start_time)
 
-		timer = Timer(id_=timer_id, start_time=timer_start_time)
+		timer = Timer(stream=sys.stdout, timer_id=timer_id, start_time=timer_start_time)
 		bytes_written = timer.end()
 		if bytes_written <= 0:
 			raise Exception("error, no bytes written")
