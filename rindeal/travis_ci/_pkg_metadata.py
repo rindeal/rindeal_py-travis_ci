@@ -1,6 +1,6 @@
 class metadata:
     name = "rindeal-travis_ci"
-    version = "0.3.0"
+    version = "0.4.0"
     url = "https://github.com/rindeal/rindeal_py-travis_ci"
     author = "Jan Chren (rindeal)"
     author_email = f"dev+{name}@janchren.eu"
