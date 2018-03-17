@@ -21,6 +21,7 @@ import sys
 import time
 import typing
 import uuid
+import re
 
 
 class AnsiEscSeq:
@@ -31,77 +32,88 @@ class AnsiEscSeq:
 	@link https://github.com/travis-ci/travis-web/blob/cf9ead330bd9eddb2a834646198dee27e420ce95/app/styles/app/vars.scss
 	@link https://github.com/travis-ci/travis-web/blob/4d89a80318fa1a4f1ba2c31a39b818563eff5e9f/app/utils/log.js
 	@link https://github.com/mmalecki/ansiparse/blob/master/lib/ansiparse.js
+	"""
 
 	# taken from `Log.Deansi` module in `app/utils/log.js`
-	__CLEAR_ANSI =
+	__CLEAR_ANSI = r"""
+	(?:
+		\033  # ESC
+	)
+	(?:
+		## 1. variant
+		## - `Query Device Code`
+		## - `Report Device Code`
+		\[  # CSI
+		0?c
+		|  # or
+
+		## 2. variant
+		## - `Report Device OK`
+		## - `Report Device Failure`
+		## - `Query Device Status`
+		## - `Query Cursor Position`
+		\[  # CSI
+		[0356]n
+		|  # or
+
+		## 3. variant
+		## - `Disable Line Wrap`
+		## - `Enable Line Wrap`
+		\[  # CSI
+		7[lh]
+		|  # or
+
+		## 4. variant
+		## - `Text Cursor Enable Mode Hide`
+		## - `Text Cursor Enable Mode Show`
+		\[  # CSI
+		\?25[lh]
+		|  # or
+
+		## 5. variant
+		## - `Designate Character Set – US ASCII`
+		\(B
+		|  # or
+
+		## 6. variant
+		## - `Horizontal Tab Set`
+		H
+		|  # or
+
+		## 7. variant
+		## - `Cursor Horizontal Absolute`
+		\[  # CSI
 		(?:
-			\033    # ESC
-		)
+			\d+
+			(
+				;\d+
+			)
+			{, 2}
+		)?
+		G
+		|  # or
+
+		## 8. variant
+		## - `Erase in Display`
+		## - `Erase in Line`
+		\[  # CSI
 		(?:
-			## 1. variant
-			## - `Query Device Code`
-			## - `Report Device Code`
-			\[      # CSI
-			0?c
-			|       # or
-			## 2. variant
-			## - `Report Device OK`
-			## - `Report Device Failure`
-			## - `Query Device Status`
-			## - `Query Cursor Position`
-			\[      # CSI
-			[0356]n
-			|       # or
-			## 3. variant
-			## - `Disable Line Wrap`
-			## - `Enable Line Wrap`
-			\[      # CSI
-			7[lh]
-			|       # or
-			## 4. variant
-			## - `Text Cursor Enable Mode Hide`
-			## - `Text Cursor Enable Mode Show`
-			\[      # CSI
-			\?25[lh]
-			|       # or
-			## 5. variant
-			## - `Designate Character Set – US ASCII`
-			\(B
-			|       # or
-			## 6. variant
-			## - `Horizontal Tab Set`
-			H
-			|
-			## 7. variant
-			## - `Cursor Horizontal Absolute`
-			\[      # CSI
-			(?:
-				\d+
-				(
-					;\d+
-				){,2}
-			)?
-			G
-			|
-			## 8. variant
-			## - `Erase in Display`
-			## - `Erase in Line`
-			\[  # CSI
-			(?:
-				[12]
-			)?
-			[JK]
-			|
-			## 9. variant
-			## - `Cursor Backward (Left) by 1`
-			## - `Reverse Index`
-			[DM]
-			|
-			## 10. variant
-			## - clear
-			\[  # CSI
-			0K
-		)
+			[12]
+		)?
+		[JK]
+		|  # or
+
+		## 9. variant
+		## - `Cursor Backward (Left) by 1`
+		## - `Reverse Index`
+		[DM]
+		|  # or
+
+		## 10. variant
+		## - clear
+		\[  # CSI
+		0K
+	)
 	"""
 
 	ESC: str = "\x1B"
@@ -275,7 +287,7 @@ def colour(*args, **kwargs):
 	return AnsiEscSeq.colour(*args, **kwargs)
 
 
-class _TimerFoldBase:
+class _FoldTimeBase:
 	_stream: typing.Optional[typing.TextIO]
 	_MaybeStreamType = typing.Union[int, str]
 
@@ -301,14 +313,87 @@ class _TimerFoldBase:
 		self.end()
 
 
-class Timer(_TimerFoldBase):
+class Fold(_FoldTimeBase):
+	"""
+	::
+
+		| travis_fold() {
+		|     local action=$1
+		|     local name=$2
+		|     echo -en "travis_fold:${action}:${name}\\r${ANSI_CLEAR}"
+		| }
+
+	"""
+
+	_tag: str
+	_desc: str
+	_started: bool
+
+	# https://github.com/travis-ci/travis-web/blob/4d89a80/app/utils/log.js#L30
+	_re_tag = re.compile(r"([\w_\-\.]+)")
+
+	def __init__(self, tag: str, desc: str ="", stream: typing.TextIO =sys.stdout, started: bool =False):
+		super().__init__(stream)
+
+		self._tag = tag
+		if self._re_tag.search(self._tag) is None:
+			raise ValueError("Invalid tag name")
+		self._desc = desc
+		self._started = started
+
+	def _action(self, action: str) -> str:
+		tmpl = 'travis_fold:{action}:{tag}\r{clear}'
+		return tmpl.format(action=action, tag=self._tag, clear=AnsiEscSeq.el())
+
+	def desc(self, text: str) -> _FoldTimeBase._MaybeStreamType:
+		"""
+		Yellow is the colour Travis CI uses for this purpose.
+		Examples are: `Build system information`, `Worker information`, ...
+		"""
+		str_out = AnsiEscSeq.colour(text, fg='yellow') + "\n"
+		return self._maybe_stream_write(str_out)
+
+	def start(self) -> _FoldTimeBase._MaybeStreamType:
+		"""
+		@link https://github.com/travis-ci/worker/blob/a8bdf4846ac390bba372d3f56ff0552a025da4af/package.go
+
+		:return: Number of bytes written
+		"""
+		if self._started:
+			raise Exception("travis fold already started")
+		self._started = True
+
+		str_action = self._action('start')
+		out = 0 if self._stream else ""
+
+		if self._desc:
+			out += self.desc(self._desc)
+
+		return self._maybe_stream_write(str_action) + out
+
+	def end(self) -> _FoldTimeBase._MaybeStreamType:
+		if not self._started:
+			raise Exception("travis fold not started yet")
+
+		str_out = self._action('end')
+
+		return self._maybe_stream_write(str_out)
+
+
+class Time(_FoldTimeBase):
 
 	_id: str
 	_start_time: int
 
+	# https://github.com/travis-ci/travis-web/blob/4d89a80/app/utils/log.js#L31
+	_re_id = re.compile(r"([\w_\-\.]+)")
+
 	def __init__(self, stream: typing.TextIO =sys.stdout, timer_id: str =None, start_time: int =0):
 		super().__init__(stream)
-		self._id = timer_id if timer_id else uuid.uuid4()
+
+		self._id = timer_id if timer_id else str(uuid.uuid4())
+		if self._re_id.search(self._id) is None:
+			raise ValueError("invalid timer id")
 		self._start_time = start_time
 
 	def get_id(self) -> str:
@@ -321,7 +406,7 @@ class Timer(_TimerFoldBase):
 	def _nanoseconds():
 		return int(time.time()*1e9)
 
-	def start(self) -> _TimerFoldBase._MaybeStreamType:
+	def start(self) -> _FoldTimeBase._MaybeStreamType:
 		"""
 		Start timer
 
@@ -345,7 +430,7 @@ class Timer(_TimerFoldBase):
 
 		return self._maybe_stream_write(str_out)
 
-	def end(self) -> _TimerFoldBase._MaybeStreamType:
+	def end(self) -> _FoldTimeBase._MaybeStreamType:
 		"""
 		End timer and write result
 
@@ -378,59 +463,3 @@ class Timer(_TimerFoldBase):
 
 		return self._maybe_stream_write(str_out)
 
-
-class Fold(_TimerFoldBase):
-	"""
-	::
-
-		| travis_fold() {
-		|     local action=$1
-		|     local name=$2
-		|     echo -en "travis_fold:${action}:${name}\\r${ANSI_CLEAR}"
-		| }
-
-	"""
-
-	_tag: str
-	_desc: str
-	_started: bool
-
-	def __init__(self, tag: str, desc: str ="", stream: typing.TextIO =sys.stdout, started: bool =False):
-		self._tag = tag
-		self._desc = desc
-		super().__init__(stream)
-		self._started = started
-
-	def _action(self, action: str) -> str:
-		tmpl = 'travis_fold:{action}:{tag}\r{clear}'
-		return tmpl.format(action=action, tag=self._tag, clear=AnsiEscSeq.el())
-
-	def start(self) -> _TimerFoldBase._MaybeStreamType:
-		"""
-		@link https://github.com/travis-ci/worker/blob/a8bdf4846ac390bba372d3f56ff0552a025da4af/package.go
-
-		:return: Number of bytes written
-		"""
-		if self._started:
-			raise Exception("travis fold already started")
-		self._started = True
-
-		str_out = self._action('start')
-
-		if self._desc:
-			"""
-			Yellow is the colour Travis CI uses for this purpose.
-			Examples are: `Build system information`, `Worker information`, ...
-			"""
-			str_out += AnsiEscSeq.colour(self._desc, fg='yellow')
-			str_out += "\n"
-
-		return self._maybe_stream_write(str_out)
-
-	def end(self) -> _TimerFoldBase._MaybeStreamType:
-		if not self._started:
-			raise Exception("travis fold not started yet")
-
-		str_out = self._action('end')
-
-		return self._maybe_stream_write(str_out)

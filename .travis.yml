@@ -1,13 +1,16 @@
-language: generic
-sudo: enabled
-services: docker
+language: python
+sudo: false
 
-before_install:
-  - export DOCKER_IMAGE=debian:sid
-  - docker pull $DOCKER_IMAGE
+python:
+  - "3.6"
+  - "3.7-dev"
+
+matrix:
+  allow_failures:
+    - python: "3.7-dev"
 
 script:
-  - .travis-ci/run_docker.sh $DOCKER_IMAGE
+  - .travis-ci/test.sh
 
 notifications:
   email: false
