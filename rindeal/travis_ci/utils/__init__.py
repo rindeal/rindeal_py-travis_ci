@@ -309,7 +309,7 @@ class _FoldTimeBase:
 		self.start()
 		return self
 
-	def __exit__(self, *args) -> None:
+	def __exit__(self, *_) -> None:
 		self.end()
 
 
@@ -463,3 +463,32 @@ class Time(_FoldTimeBase):
 
 		return self._maybe_stream_write(str_out)
 
+
+class TimedFold(_FoldTimeBase):
+	_fold: Fold
+	_time: Time
+	_fold_desc: str
+
+	def __init__(
+			self,
+			tag,
+			desc: str = "",
+			stream: typing.TextIO =sys.stdout,
+			fold_kwargs: dict ={},
+			time_kwargs: dict ={}
+	):
+		super().__init__(stream)
+
+		self._fold = Fold(tag, stream=stream, **fold_kwargs)
+		self._time = Time(stream=stream, **time_kwargs)
+		self._fold_desc = desc
+
+	def start(self):
+		self._fold.start()
+		self._time.start()
+		if self._fold_desc:
+			self._fold.desc(self._fold_desc)
+
+	def end(self):
+		self._time.end()
+		self._fold.end()
