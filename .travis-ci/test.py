@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(__DIR__, "..")))
 from rindeal.travis_ci.utils import *
 
 
-with Fold("fold tag") as fold:
+with Fold("fold.tag") as fold:
 	with Time():
 		fold.desc("Fold Time Description")
 	print("content")
