@@ -8,10 +8,12 @@ Examples
 ---------
 
 ```python
-with Fold("tag.1", desc="My First Proper Travis CI Fold"):
+with Fold("fold.tag", "My First Proper Travis CI Fold"):
     print("this will be folded")
-    with Time():
-        print("this will even show timing information in the rightmost column of the travis logviewer")
+with Time():
+    print("this will show timing information in the rightmost column of the travis logviewer")
+with TimedFold("timedfold.tag", "Timed Fold"):
+    print("This will do both - fold and time")
 
 print(colour("and this will print colourful text", fg="green", bg="red", style="bold+underline"))
 ```
