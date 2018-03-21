@@ -17,15 +17,9 @@ with Fold("fold.tag") as fold:
 	print("content")
 	print("content")
 
-with Fold("fold.tag.1") as fold_1:
-	with Time():
-		fold_1.desc("Fold 1 Description")
-		print("content 1\n"*3)
-		with Fold("fold.tag.2") as fold_2:
-			with Time():
-				fold_2.desc("Fold 2 Description")
-				print("content 2\n" * 3)
-				with Fold("fold.tag.3") as fold_3:
-					with Time():
-						fold_3.desc("Fold 3 Description")
-						print("content 3\n" * 3)
+with TimedFold("fold.tag.1", "Fold 1 Description"):
+	print("content 1\n"*3)
+	with TimedFold("fold.tag.2", "Fold 2 Description"):
+		print("content 2\n" * 3)
+		with TimedFold("fold.tag.3", "Fold 3 Description"):
+			print("content 3\n" * 3)
