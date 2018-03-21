@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/travis-ci-utils.iml" filepath="$PROJECT_DIR$/.idea/travis-ci-utils.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/travis_ci_utils.py.iml" filepath="$PROJECT_DIR$/.idea/travis_ci_utils.py.iml" />
     </modules>
   </component>

@@ -23,6 +23,7 @@ import sys
 import pathlib
 import tempfile
 import os
+import pickle
 
 if os.path.exists("rindeal/travis_ci/utils"):
 	sys.path.insert(0, ".")
@@ -34,7 +35,8 @@ SubParserType = type(argparse.ArgumentParser().add_subparsers())
 
 
 class SubCmd:
-	name: str
+	_CLS_NAME_PREFIX = "SubCmd"
+
 	_parser: argparse.ArgumentParser = None
 	_args: argparse.Namespace = None
 
@@ -45,17 +47,24 @@ class SubCmd:
 		self._parser = parser
 		self._args = args
 
+	def get_name(self):
+		return self.__class__.__name__[len(self._CLS_NAME_PREFIX):].lower()
+
+	def _get_parser(self, sub_parser: SubParserType):
+		return sub_parser.add_parser(self.get_name())
+
 
 class SubCmdFold(SubCmd):
-	name = "fold"
 	_bytes_written: int = 0
 
 	def __init__(self, sub_parser):
-		parser = sub_parser.add_parser(self.name)
+		parser = self._get_parser(sub_parser)
+
 		group = parser.add_mutually_exclusive_group(required=True)
 		group.add_argument('-start', help='Start a fold', action='store_true')
-		group.add_argument('-end', help='End a fold', action='store_true')
-		group.add_argument('-desc', help='Print description of a fold', metavar='DESC', nargs=1)
+		group.add_argument('-end',   help='End a fold', action='store_true')
+		group.add_argument('-desc',  help='Print description of a fold', metavar='DESC', nargs=1)
+
 		parser.add_argument(
 			'--desc',
 			help='Description of the fold, usable only with `-start`',
@@ -93,62 +102,64 @@ class SubCmdFold(SubCmd):
 
 
 class SubCmdTime(SubCmd):
-	name = "time"
-	_bytes_written: int = 0
+	_IPC_ID_PREFIX = '__TRAVIS_CI_TIME_'
 
-	_delimiter = ':'
-	_ipc_id_prefix = '__TRAVIS_CI_TIME_'
+	_bytes_written: int = 0
+	_tmpfile: pathlib.PosixPath = None
 
 	def __init__(self, sub_parser):
-		parser = sub_parser.add_parser(self.name)
+		parser = self._get_parser(sub_parser)
+
 		group = parser.add_mutually_exclusive_group(required=True)
 		group.add_argument('-start', '--start', help='Start timing', action='store_true')
-		group.add_argument('-end', '--end', help='End timing', action='store_true')
-		parser.add_argument('ID', help='ID of the timer', action='store', nargs=1)
+		group.add_argument('-end',   '--end',   help='End timing', action='store_true')
+
+		parser.add_argument('ID', help='ID of the timer', nargs=1)
 
 	def handle(self, parser, args):
 		super().handle(parser, args)
 
-		tmpfile = pathlib.PosixPath(
+		self._tmpfile = pathlib.PosixPath(
 			tempfile.gettempdir(),
-			tempfile.gettempprefix() + "." + self._ipc_id_prefix + "." + self._args.ID[0]
+			tempfile.gettempprefix() + "." + self._IPC_ID_PREFIX + "." + self._args.ID[0]
 		)
 
 		if args.start:
-			self._handle_start(tmpfile)
+			self._handle_start()
 		elif args.end:
-			self._handle_end(tmpfile)
+			self._handle_end()
 		else:
 			self._parser.error("invalid args, this shouldn't happen")
 
 		if self._bytes_written <= 0:
 			self._parser.error("no bytes written")
 
-	def _handle_start(self, tmpfile: pathlib.PosixPath) -> None:
+	def _handle_start(self) -> None:
 		timer = Time(stream=sys.stdout)
 		self._bytes_written = timer.start()
 
-		timer_id = timer.get_id()
-		timer_start_time = timer.get_start_time()
+		start_obj = {
+			'id': timer.get_id(),
+			'start_time': timer.get_start_time()
+		}
 
-		# >> create and write timer object
-		start_obj = f"{timer_id}{self._delimiter}{timer_start_time}"
-		with tmpfile.open('w+') as f:
-			f.write(start_obj)
+		with self._tmpfile.open('w+') as f:
+			pickle.dump(start_obj, f)
 
-	def _handle_end(self, tmpfile: pathlib.PosixPath) -> None:
-		# >> read timer object
-		if not tmpfile.exists():
+	def _handle_end(self) -> None:
+		# >> check
+		if not self._tmpfile.exists():
 			self._parser.error('no timer with this id found')
-		with tmpfile.open('r') as f:
-			start_obj = f.read()
-		tmpfile.unlink()
 
-		# >> parse timer object
-		timer_id, timer_start_time = start_obj.split(self._delimiter)
-		timer_start_time = int(timer_start_time)
+		# >> load
+		with self._tmpfile.open('r') as f:
+			start_obj = pickle.load(f)
 
-		timer = Time(stream=sys.stdout, timer_id=timer_id, start_time=timer_start_time)
+		# >> clean
+		self._tmpfile.unlink()
+
+		# >> process
+		timer = Time(stream=sys.stdout, timer_id=start_obj['id'], start_time=start_obj['start_time'])
 		self._bytes_written = timer.end()
 
 
@@ -157,8 +168,8 @@ class Main:
 	sub_cmd_arg_name = 'sub_cmd_name'
 
 	def main(self):
-		parser = self.create_main_parser()
-		self.add_subparsers(parser)
+		parser = self._create_main_parser()
+		self._add_subparsers(parser)
 
 		args: argparse.Namespace = parser.parse_args()
 
@@ -166,12 +177,11 @@ class Main:
 		if sub_cmd_name:
 			sub_cmd_obj = self.sub_cmds[sub_cmd_name]
 			handle_method = getattr(sub_cmd_obj, 'handle')
-			handle_method(parser, args)
+			return handle_method(parser, args)
 		else:
-			parser.print_usage()
+			return parser.print_usage()
 
-	@staticmethod
-	def create_main_parser() -> argparse.ArgumentParser:
+	def _create_main_parser(self) -> argparse.ArgumentParser:
 		parser = argparse.ArgumentParser(
 			description=metadata.short_description,
 			formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -193,25 +203,22 @@ class Main:
 
 		return parser
 
-	def add_subparsers(self, main_parser):
+	def _add_subparsers(self, main_parser):
 		cmd_parser: SubParserType = main_parser.add_subparsers(
 			help='Pick one of the subcommands',
 			dest=self.sub_cmd_arg_name,
 		)
 
-		sub_cmd_cls_prefix = "SubCmd"
-		sub_cmd_classes = {
-			cls.name: cls
-			for name, cls in globals().items()
-			if name.startswith(sub_cmd_cls_prefix) and len(name) > len(sub_cmd_cls_prefix)
-		}
-
-		for cmd_name, cmd_cls in sub_cmd_classes.items():
-			self.sub_cmds[cmd_name] = cmd_cls(sub_parser=cmd_parser)
+		for name, cls in globals().items():
+			if not (hasattr(cls, "__bases__") and SubCmd in cls.__bases__):
+				continue
+			obj: SubCmd = cls(sub_parser=cmd_parser)
+			cmd_name = obj.get_name()
+			self.sub_cmds[cmd_name] = obj
 
 
 if __name__ == "__main__":
 	m = Main()
-	m.main()
+	exit(m.main())
 else:
 	exit("this script is not importable")
