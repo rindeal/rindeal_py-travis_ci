@@ -13,12 +13,10 @@ from rindeal.travis_ci.utils import *
 with Fold("fold.tag") as fold:
 	with Time():
 		fold.desc("Fold Time Description")
-	print("content")
-	print("content")
-	print("content")
+		print("content\n" * 3)
 
 with TimedFold("fold.tag.1", "Fold 1 Description"):
-	print("content 1\n"*3)
+	print("content 1\n" * 3)
 	with TimedFold("fold.tag.2", "Fold 2 Description"):
 		print("content 2\n" * 3)
 		with TimedFold("fold.tag.3", "Fold 3 Description"):
