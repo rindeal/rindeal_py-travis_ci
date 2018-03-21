@@ -330,7 +330,7 @@ class Fold(_FoldTimeBase):
 	_started: bool
 
 	# https://github.com/travis-ci/travis-web/blob/4d89a80/app/utils/log.js#L30
-	_re_tag = re.compile(r"([\w_\-\.]+)")
+	_re_tag = re.compile(r"^([\w_\-\.]+)$")
 
 	def __init__(self, tag: str, desc: str ="", stream: typing.TextIO =sys.stdout, started: bool =False):
 		super().__init__(stream)
@@ -386,7 +386,7 @@ class Time(_FoldTimeBase):
 	_start_time: int
 
 	# https://github.com/travis-ci/travis-web/blob/4d89a80/app/utils/log.js#L31
-	_re_id = re.compile(r"([\w_\-\.]+)")
+	_re_id = re.compile(r"^([\w_\-\.]+)$")
 
 	def __init__(self, stream: typing.TextIO =sys.stdout, timer_id: str =None, start_time: int =0):
 		super().__init__(stream)
