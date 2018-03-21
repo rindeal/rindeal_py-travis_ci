@@ -2,6 +2,9 @@
 
 set -ue
 
+__DIR__="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+
 CMD=./bin/travis-ci-utils
 
 
@@ -40,3 +43,7 @@ $CMD fold -desc "Fold Timer Description"
 echo '$ command'
 $CMD time -end fold.timer.id2
 $CMD fold -end fold.timer.tag2
+
+echo "=========== Test Python Lib ================"
+
+"${__DIR__}/test.py"
