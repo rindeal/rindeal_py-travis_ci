@@ -36,10 +36,12 @@ SubParserRegistratorType = type(argparse.ArgumentParser().add_subparsers())
 
 class SubCmd:
 	_main_parser: argparse.ArgumentParser
+	_parser: argparse.ArgumentParser
 	_args: argparse.Namespace = None
 
 	def __init__(self, main_parser: argparse.ArgumentParser, sub_parser_registrator: SubParserRegistratorType) -> None:
 		self._main_parser = main_parser
+		self._parser: argparse.ArgumentParser = sub_parser_registrator.add_parser(self.get_name())
 
 	def handle(self, args: argparse.Namespace) -> int:
 		self._args = args
@@ -48,24 +50,39 @@ class SubCmd:
 	def get_name(self) -> str:
 		return self.__class__.__name__[len("SubCmd"):].lower()
 
+	@classmethod
+	def register_sub_cmds(
+			cls,
+			main_parser: argparse.ArgumentParser,
+			sub_parser_registrator: SubParserRegistratorType
+	) -> typing.Dict[str, 'SubCmd']:
+		sub_cmds = {}
+
+		for name, klass in globals().items():
+			if not (hasattr(klass, "__bases__") and cls in klass.__bases__):
+				continue
+			sub_cmd: cls = klass(main_parser, sub_parser_registrator)
+			sub_cmds[sub_cmd.get_name()] = sub_cmd
+
+		return sub_cmds
+
 
 class SubCmdFold(SubCmd):
 	_bytes_written: int = 0
 
 	def __init__(self, main_parser, sub_parser_registrator):
 		super().__init__(main_parser, sub_parser_registrator)
-		parser: argparse.ArgumentParser = sub_parser_registrator.add_parser(self.get_name())
 
-		group = parser.add_mutually_exclusive_group(required=True)
+		group = self._parser.add_mutually_exclusive_group(required=True)
 		group.add_argument('-start', help='Start a fold', action='store_true')
 		group.add_argument('-end',   help='End a fold', action='store_true')
 		group.add_argument('-desc',  help='Print description of a fold', metavar='DESC')
 
-		parser.add_argument(
+		self._parser.add_argument(
 			'--description',
 			help='Description of the fold, usable only with `-start`'
 		)
-		parser.add_argument('TAG', help='Tag of the fold; requires for `-start`/`-end`', nargs="?")
+		self._parser.add_argument('TAG', help='Tag of the fold; requires for `-start`/`-end`', nargs="?")
 
 	def handle(self, args) -> None:
 		super().handle(args)
@@ -85,15 +102,15 @@ class SubCmdFold(SubCmd):
 		return 0
 
 	def _handle_start(self, tag, desc: str) -> None:
-		fold = Fold(tag=tag, desc=desc, stream=sys.stdout)
+		fold = Fold(tag=tag, desc=desc)
 		self._bytes_written = fold.start()
 
 	def _handle_end(self, tag) -> None:
-		fold = Fold(tag=tag, started=True, stream=sys.stdout)
+		fold = Fold(tag=tag, started=True)
 		self._bytes_written = fold.end()
 
 	def _handle_desc(self, desc: str) -> None:
-		fold = Fold(tag="NOT.USED", started=True, stream=sys.stdout)
+		fold = Fold(tag="NOT.USED", started=True)
 		self._bytes_written = fold.desc(desc)
 
 
@@ -105,13 +122,12 @@ class SubCmdTime(SubCmd):
 
 	def __init__(self, main_parser, sub_parser_registrator):
 		super().__init__(main_parser, sub_parser_registrator)
-		parser: argparse.ArgumentParser = sub_parser_registrator.add_parser(self.get_name())
 
-		group = parser.add_mutually_exclusive_group(required=True)
+		group = self._parser.add_mutually_exclusive_group(required=True)
 		group.add_argument('-start', help='Start timing', action='store_true')
 		group.add_argument('-end',   help='End timing', action='store_true')
 
-		parser.add_argument('ID', help='ID of the timer')
+		self._parser.add_argument('ID', help='ID of the timer')
 
 	def handle(self, args):
 		super().handle(args)
@@ -132,7 +148,7 @@ class SubCmdTime(SubCmd):
 			self._main_parser.error("no bytes written")
 
 	def _handle_start(self) -> None:
-		timer = Time(stream=sys.stdout)
+		timer = Time()
 		self._bytes_written = timer.start()
 
 		start_obj = {
@@ -156,23 +172,26 @@ class SubCmdTime(SubCmd):
 		self._tmpfile.unlink()
 
 		# >> process
-		timer = Time(stream=sys.stdout, timer_id=start_obj['id'], start_time=start_obj['start_time'])
+		timer = Time(timer_id=start_obj['id'], start_time=start_obj['start_time'])
 		self._bytes_written = timer.end()
 
 
 class Main:
-	_sub_cmds: typing.Dict[str, SubCmd] = {}
 	_SUB_CMD_PARSER_DEST_NAME = 'sub_cmd_name'
 
 	def main(self):
 		parser = self._create_main_parser()
-		self._register_sub_cmds(parser)
+		sub_parser_registrator: SubParserRegistratorType = parser.add_subparsers(
+			help='Pick one of the subcommands',
+			dest=self._SUB_CMD_PARSER_DEST_NAME,
+		)
+		sub_cmds = SubCmd.register_sub_cmds(parser, sub_parser_registrator)
 
 		args: argparse.Namespace = parser.parse_args()
 
 		sub_cmd_name = getattr(args, self._SUB_CMD_PARSER_DEST_NAME)
 		if sub_cmd_name:
-			return self._sub_cmds[sub_cmd_name].handle(args)
+			return sub_cmds[sub_cmd_name].handle(args)
 
 		parser.print_usage()
 		return 1
@@ -198,19 +217,6 @@ class Main:
 		)
 
 		return parser
-
-	def _register_sub_cmds(self, main_parser: argparse.ArgumentParser):
-		sub_parser_factory: SubParserRegistratorType = main_parser.add_subparsers(
-			help='Pick one of the subcommands',
-			dest=self._SUB_CMD_PARSER_DEST_NAME,
-		)
-
-		for name, cls in globals().items():
-			if not (hasattr(cls, "__bases__") and SubCmd in cls.__bases__):
-				continue
-			obj: SubCmd = cls(main_parser, sub_parser_factory)
-			cmd_name = obj.get_name()
-			self._sub_cmds[cmd_name] = obj
 
 
 if __name__ == "__main__":
