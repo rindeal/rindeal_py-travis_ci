@@ -143,7 +143,7 @@ class SubCmdTime(SubCmd):
 			'start_time': timer.get_start_time()
 		}
 
-		with self._tmpfile.open('w+') as f:
+		with self._tmpfile.open('wb+') as f:
 			pickle.dump(start_obj, f)
 
 	def _handle_end(self) -> None:
@@ -152,7 +152,7 @@ class SubCmdTime(SubCmd):
 			self._parser.error('no timer with this id found')
 
 		# >> load
-		with self._tmpfile.open('r') as f:
+		with self._tmpfile.open('rb') as f:
 			start_obj = pickle.load(f)
 
 		# >> clean
