@@ -364,12 +364,12 @@ class Fold(_FoldTimeBase):
 		self._started = True
 
 		str_action = self._action('start')
-		out = 0 if self._stream else ""
+		out = self._maybe_stream_write(str_action)
 
 		if self._desc:
 			out += self.desc(self._desc)
 
-		return self._maybe_stream_write(str_action) + out
+		return out
 
 	def end(self) -> _FoldTimeBase._MaybeStreamType:
 		if not self._started:
