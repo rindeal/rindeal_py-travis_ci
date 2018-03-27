@@ -301,7 +301,13 @@ class _FoldTimeBase:
 		raise NotImplementedError
 
 	def _maybe_stream_write(self, str_out: str) -> _MaybeStreamType:
-		return self._stream.write(str_out) if self._stream else str_out
+		ret = str_out
+		if self._stream:
+			ret = self._stream.write(str_out)
+			if ret:
+				self._stream.flush()
+
+		return ret
 
 	def __enter__(self):
 		if not self._stream:
