@@ -300,6 +300,9 @@ class _FoldTimeBase:
 	def end(self) -> _MaybeStreamType:
 		raise NotImplementedError
 
+	def started(self) -> bool:
+		raise NotImplementedError
+
 	def _maybe_stream_write(self, str_out: str) -> _MaybeStreamType:
 		ret = str_out
 		if self._stream:
@@ -385,6 +388,9 @@ class Fold(_FoldTimeBase):
 
 		return self._maybe_stream_write(str_out)
 
+	def started(self):
+		return self._started
+
 
 class Time(_FoldTimeBase):
 
@@ -469,6 +475,9 @@ class Time(_FoldTimeBase):
 
 		return self._maybe_stream_write(str_out)
 
+	def started(self):
+		return bool(self._start_time)
+
 
 class TimedFold(_FoldTimeBase):
 	_fold: Fold
@@ -498,3 +507,6 @@ class TimedFold(_FoldTimeBase):
 	def end(self):
 		self._time.end()
 		self._fold.end()
+
+	def started(self):
+		return self._fold.started() and self._time.started()
