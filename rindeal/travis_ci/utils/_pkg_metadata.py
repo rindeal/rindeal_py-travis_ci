@@ -1,7 +1,7 @@
 class metadata:
     name = "travis-ci-utils"
     short_description = "Rindeal's Suite of Helpers and Utilities for Travis CI Jobs"
-    version = "0.6.0"
+    version = "0.10.0"
     url = "https://github.com/rindeal/travis-ci-utils"
     author = "Jan Chren (rindeal)"
     author_email = f"dev+{name}@janchren.eu"
