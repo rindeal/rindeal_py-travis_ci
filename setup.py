@@ -18,10 +18,12 @@
 
 from distutils.core import setup
 import sys
+import os
 
 
 # make sure local modules are imported
-sys.path.insert(0, ".")
+__DIR__ = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, __DIR__)
 from rindeal.travis_ci.utils._pkg_metadata import metadata
 
 

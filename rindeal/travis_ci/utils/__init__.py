@@ -24,14 +24,40 @@ import uuid
 import re
 
 
+class _Styling(typing.NamedTuple):
+	name: str
+	code: int
+	reset: int
+
+
+class _StylingLookupTable(dict):
+	_code_to_name_mapping: dict
+
+	def __init__(self, *stylings: _Styling):
+		super().__init__({styling.name: styling for styling in stylings})
+		self._code_to_name_mapping = dict([(styling.code, styling.name) for styling in stylings])
+
+	def __setitem__(self, key, value):
+		raise Exception("No additional items can be added")
+
+	def __getitem__(self, key: typing.Union[str, int]) -> _Styling:
+		if isinstance(key, int) and key in self._code_to_name_mapping:
+			key = self._code_to_name_mapping[key]
+
+		if key not in self:
+			raise KeyError(f"Invalid item requested! '{key}' is not present.")
+
+		return super().__getitem__(key)
+
+
 class AnsiEscSeq:
 	"""
-	@link http://www.termsys.demon.co.uk/vtansi.htm
-	@link http://www.ecma-international.org/publications/files/ECMA-ST/Ecma-048.pdf
-	@link https://github.com/travis-ci/travis-web/blob/cf9ead330bd9eddb2a834646198dee27e420ce95/app/styles/app/layouts/ansi.scss
-	@link https://github.com/travis-ci/travis-web/blob/cf9ead330bd9eddb2a834646198dee27e420ce95/app/styles/app/vars.scss
-	@link https://github.com/travis-ci/travis-web/blob/4d89a80318fa1a4f1ba2c31a39b818563eff5e9f/app/utils/log.js
-	@link https://github.com/mmalecki/ansiparse/blob/master/lib/ansiparse.js
+	:link http://www.termsys.demon.co.uk/vtansi.htm
+	:link http://www.ecma-international.org/publications/files/ECMA-ST/Ecma-048.pdf
+	:link https://github.com/travis-ci/travis-web/blob/cf9ead330bd9eddb2a834646198dee27e420ce95/app/styles/app/layouts/ansi.scss
+	:link https://github.com/travis-ci/travis-web/blob/cf9ead330bd9eddb2a834646198dee27e420ce95/app/styles/app/vars.scss
+	:link https://github.com/travis-ci/travis-web/blob/4d89a80318fa1a4f1ba2c31a39b818563eff5e9f/app/utils/log.js
+	:link https://github.com/mmalecki/ansiparse/blob/master/lib/ansiparse.js
 	"""
 
 	# taken from `Log.Deansi` module in `app/utils/log.js`
@@ -125,81 +151,77 @@ class AnsiEscSeq:
 	Control Sequence Introducer
 	"""
 
-	CONTROL_FUNCTIONS = {
+	FG_BLACK = 30
+	FG_RED = 31
+	FG_GREEN = 32
+	FG_YELLOW = 33
+	FG_BLUE = 34
+	FG_MAGENTA = 35
+	FG_CYAN = 36
+	FG_WHITE = 37
+	FG_BRIGHT_BLACK = 90
 
-	}
+	FG_DEFAULT = 39
 
-	FG_BLACK = "30"
-	FG_RED = "31"
-	FG_GREEN = "32"
-	FG_YELLOW = "33"
-	FG_BLUE = "34"
-	FG_MAGENTA = "35"
-	FG_CYAN = "36"
-	FG_WHITE = "37"
-	FG_BRIGHT_BLACK = "90"
-
-	FG_DEFAULT = "39"
-
-	FG_COLOURS = {
-		"black":    {"open": FG_BLACK,      "rgb": "", "close": FG_DEFAULT},
-		"red":      {"open": FG_RED,        "close": FG_DEFAULT},
-		"green":    {"open": FG_GREEN,      "close": FG_DEFAULT},
-		"yellow":   {"open": FG_YELLOW,     "close": FG_DEFAULT},
-		"blue":     {"open": FG_BLUE,       "close": FG_DEFAULT},
-		"magenta":  {"open": FG_MAGENTA,    "close": FG_DEFAULT},
-		"cyan":     {"open": FG_CYAN,       "close": FG_DEFAULT},
-		"white":    {"open": FG_WHITE,      "close": FG_DEFAULT},
-		"grey":     {"open": FG_BRIGHT_BLACK, "close": FG_DEFAULT},
-	}
+	FG_COLOURS = _StylingLookupTable(
+		_Styling("black",   FG_BLACK,   FG_DEFAULT),
+		_Styling("red",     FG_RED,     FG_DEFAULT),
+		_Styling("green",   FG_GREEN,   FG_DEFAULT),
+		_Styling("yellow",  FG_YELLOW,  FG_DEFAULT),
+		_Styling("blue",    FG_BLUE,    FG_DEFAULT),
+		_Styling("magenta", FG_MAGENTA, FG_DEFAULT),
+		_Styling("cyan",    FG_CYAN,    FG_DEFAULT),
+		_Styling("white",   FG_WHITE,   FG_DEFAULT),
+		_Styling("grey",    FG_BRIGHT_BLACK, FG_DEFAULT),
+	)
 	"""
 	@link https://github.com/mmalecki/ansiparse/blob/master/lib/ansiparse.js#L154
 	"""
 
-	BG_BLACK = "40"
-	BG_RED = "41"
-	BG_GREEN = "42"
-	BG_YELLOW = "43"
-	BG_BLUE = "44"
-	BG_MAGENTA = "45"
-	BG_CYAN = "46"
-	BG_WHITE = "47"
+	BG_BLACK = 40
+	BG_RED = 41
+	BG_GREEN = 42
+	BG_YELLOW = 43
+	BG_BLUE = 44
+	BG_MAGENTA = 45
+	BG_CYAN = 46
+	BG_WHITE = 47
 
-	BG_DEFAULT = "49"
+	BG_DEFAULT = 49
 
-	BG_COLOURS = {
-		"black":    {"open": BG_BLACK,      "close": BG_DEFAULT},
-		"red":      {"open": BG_RED,        "close": BG_DEFAULT},
-		"green":    {"open": BG_GREEN,      "close": BG_DEFAULT},
-		"yellow":   {"open": BG_YELLOW,     "close": BG_DEFAULT},
-		"blue":     {"open": BG_BLUE,       "close": BG_DEFAULT},
-		"magenta":  {"open": BG_MAGENTA,    "close": BG_DEFAULT},
-		"cyan":     {"open": BG_CYAN,       "close": BG_DEFAULT},
-		"white":    {"open": BG_WHITE,      "close": BG_DEFAULT},
-	}
+	BG_COLOURS = _StylingLookupTable(
+		_Styling("black",   BG_BLACK,   BG_DEFAULT),
+		_Styling("red",     BG_RED,     BG_DEFAULT),
+		_Styling("green",   BG_GREEN,   BG_DEFAULT),
+		_Styling("yellow",  BG_YELLOW,  BG_DEFAULT),
+		_Styling("blue",    BG_BLUE,    BG_DEFAULT),
+		_Styling("magenta", BG_MAGENTA, BG_DEFAULT),
+		_Styling("cyan",    BG_CYAN,    BG_DEFAULT),
+		_Styling("white",   BG_WHITE,   BG_DEFAULT),
+	)
 	"""
 	@link https://github.com/mmalecki/ansiparse/blob/master/lib/ansiparse.js#L166
 	"""
 
-	BOLD_OR_INTENSE = "1"
-	ITALIC = "3"
-	SINGLY_UNDERLINED = "4"
+	BOLD_OR_INTENSE = 1
+	ITALIC = 3
+	SINGLY_UNDERLINED = 4
 
-	NORMAL_COLOUR_OR_INTENSITY = "22"
-	NOT_ITALIC = "23"
-	NOT_UNDERLINED = "24"
+	NORMAL_COLOUR_OR_INTENSITY = 22
+	NOT_ITALIC = 23
+	NOT_UNDERLINED = 24
 
-	STYLES = {
-		"bold":         {"open": BOLD_OR_INTENSE,   "close": NORMAL_COLOUR_OR_INTENSITY},
-		"italic":       {"open": ITALIC,            "close": NOT_ITALIC},
-		"underline":    {"open": SINGLY_UNDERLINED, "close": NOT_UNDERLINED},
-	}
+	STYLES = _StylingLookupTable(
+		_Styling("bold", BOLD_OR_INTENSE, NORMAL_COLOUR_OR_INTENSITY),
+		_Styling("italic", ITALIC, NOT_ITALIC),
+		_Styling("underline", SINGLY_UNDERLINED, NOT_UNDERLINED),
+	)
 	"""
 	@link https://github.com/mmalecki/ansiparse/blob/master/lib/ansiparse.js#L177
 	"""
 
 	@classmethod
-	def sgr(cls, *args: typing.Optional[typing.Sequence[typing.Union[str, int]]]):
+	def sgr(cls, *args: typing.Union[str, int]):
 		"""
 		SGR (Select Graphic Rendition)
 
@@ -210,7 +232,13 @@ class AnsiEscSeq:
 		return f'{cls.CSI}{params}m'
 
 	@classmethod
-	def colour(cls, text: str, fg: str= "", bg: str= "", style: str= "") -> str:
+	def colour(
+			cls,
+			text: str,
+			fg: typing.Optional[typing.Union[str, int]] = None,
+			bg: typing.Optional[typing.Union[str, int]] = None,
+			style: typing.Optional[typing.Union[str, int]] = None
+	) -> str:
 		"""
 		Colourize string
 
@@ -222,27 +250,25 @@ class AnsiEscSeq:
 		:param style: plus(`+`)-delimited string; possible values: `bold`, `italic` and `underline`
 		:return: colourized string
 		"""
-		codes = []
-		str_out = ""
+		stylings: typing.List[_Styling] = []
+		str_out: str = ""
 
 		if fg:
-			codes.append(cls.FG_COLOURS[fg])
+			stylings.append(cls.FG_COLOURS[fg])
 		if bg:
-			codes.append(cls.BG_COLOURS[bg])
+			stylings.append(cls.BG_COLOURS[bg])
 		if style:
 			styles = style.split('+')
 			for s in styles:
-				if s not in cls.STYLES:
-					raise Exception('invalid style')
-				codes.append(cls.STYLES[s])
+				stylings.append(cls.STYLES[s])
 
-		for c in codes:
-			str_out += cls.sgr(c['open'])
+		for c in stylings:
+			str_out += cls.sgr(c.code)
 
 		str_out += text
 
-		while codes:
-			str_out += cls.sgr(codes.pop()['close'])
+		while stylings:
+			str_out += cls.sgr(stylings.pop().reset)
 
 		return str_out
 
@@ -283,8 +309,7 @@ class AnsiEscSeq:
 		return os.isatty(sys.stdout.fileno()) and os.isatty(sys.stderr.fileno())
 
 
-def colour(*args, **kwargs):
-	return AnsiEscSeq.colour(*args, **kwargs)
+colour = AnsiEscSeq.colour
 
 
 class _FoldTimeBase:
